@@ -44,7 +44,9 @@
 #define HW_TYPE_DC           0xDC   // DC powered, for both DC and 24VAC solenoids, with boost converter and MOSFETs
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
 #define HW_TYPE_UNKNOWN      0xFF
-
+//#if defined(OS_ESP32S3_SUPERMINI)
+//#define ESP32
+//#endif
 #if defined(ESP32)
 #define HAS_TARGET_PD_VOLTAGE(revision, type) ((type) == HW_TYPE_DC)
 #elif defined(ESP8266)
@@ -424,7 +426,7 @@ enum {
 	#define ETHER_SPI_CLOCK    osboard::ETHERNET_SPI_CLOCK_HZ
 
 	#define USE_DISPLAY
-
+/*
 #elif defined(ESP32) // OpenSprinkler v4.0 ESP32-C6
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE + osboard::OS40_HARDWARE_VERSION)
@@ -451,6 +453,60 @@ enum {
 	#define PIN_FREE_LIST    {}
 
 	#define USE_DISPLAY
+*/
+#elif defined(ESP32)
+
+    #if defined(OS_ESP32S3_SUPERMINI)
+
+        #define OS_HW_VERSION (OS_HW_VERSION_BASE + osboard::S3SM_HARDWARE_VERSION)
+        /*
+         * No OS4 PCA9555, W5500, CH224 or current-sense hardware.
+         */
+        #define PIN_I2C_SCL osboard::S3SM_I2C_SCL_PIN
+        #define PIN_I2C_SDA osboard::S3SM_I2C_SDA_PIN
+        //#define SDA PIN_I2C_SDA
+        //#define SCL PIN_I2C_SCL
+        #define PIN_SR_DATA osboard::S3SM_SR_DATA_PIN
+        #define PIN_SR_CLOCK osboard::S3SM_SR_CLOCK_PIN
+        #define PIN_SR_LATCH osboard::S3SM_SR_LATCH_PIN
+        /*
+         * OE is hard-wired to GND.
+         * There is deliberately no PIN_SR_OE.
+         */
+        #define PIN_CURR_SENSE osboard::UNUSED_PIN
+        #define PIN_FREE_LIST {1, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 33, 34, 35, 36, 37, 38}
+        #define ETHER_BUFFER_SIZE 4096
+        #define ETHER_BUFFER_ALLOC_SIZE ETHER_BUFFER_SIZE
+        #define USE_DISPLAY
+        #define USE_SSD1306
+        #define PIN_NEOPIXEL osboard::S3SM_NEOPIXEL_PIN
+    #else
+        #define OS_HW_VERSION (OS_HW_VERSION_BASE + osboard::OS40_HARDWARE_VERSION)
+        #define IOEXP_PIN osboard::IO_EXPANDER_PIN_BASE
+        #define MAIN_I2CADDR osboard::MAIN_IO_EXPANDER_ADDRESS
+        #define EXP_I2CADDR_BASE osboard::EXPANDER_ADDRESS_BASE
+        #define LCD_I2CADDR osboard::LCD_ADDRESS
+        #define RTC_I2CADDR osboard::RTC_ADDRESS
+        #define CH224_I2CADDR osboard::CH224_ADDRESS
+
+        #define PIN_CURR_SENSE osboard::OS40_CURRENT_SENSE_PIN
+        #define PIN_FLASH_CS osboard::OS40_EXTERNAL_FLASH_CS_PIN
+        #define PIN_ETHER_IRQ osboard::OS40_ETHERNET_IRQ_PIN
+        #define PIN_ETHER_RESET osboard::OS40_ETHERNET_RESET_PIN
+        #define PIN_ETHER_CS osboard::OS40_ETHERNET_CS_PIN
+        #define PIN_SPI_MOSI osboard::OS40_SPI_MOSI_PIN
+        #define PIN_SPI_MISO osboard::OS40_SPI_MISO_PIN
+        #define PIN_SPI_SCK osboard::OS40_SPI_CLOCK_PIN
+        #define PIN_I2C_SCL osboard::OS40_I2C_CLOCK_PIN
+        #define PIN_I2C_SDA osboard::OS40_I2C_DATA_PIN
+        #define ETHER_SPI_CLOCK osboard::ETHERNET_SPI_CLOCK_HZ
+        #define ETHER_BUFFER_SIZE 4096
+        #define ETHER_BUFFER_ALLOC_SIZE ETHER_BUFFER_SIZE
+        #define PIN_FREE_LIST {}
+
+        #define USE_DISPLAY
+
+    #endif
 
 #elif defined(OSPI) // for OSPi
 

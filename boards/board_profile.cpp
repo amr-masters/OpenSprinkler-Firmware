@@ -70,6 +70,26 @@ const BoardProfile OS40_PROFILE OSBOARD_PROGMEM = {
 	CAP_ETHERNET,
 };
 
+const BoardProfile ESP32S3_SUPERMINI_PROFILE OSBOARD_PROGMEM = {
+    {
+        {UNUSED_PIN, UNUSED_PIN, UNUSED_PIN},       // buttons
+        {UNUSED_PIN, UNUSED_PIN, UNUSED_PIN, UNUSED_PIN}, // sensors
+        {UNUSED_PIN, UNUSED_PIN, UNUSED_PIN, UNUSED_PIN}, // sensor pullups
+        UNUSED_PIN,                                  // rf_rx
+        UNUSED_PIN,                                  // rf_tx
+        UNUSED_PIN,                                  // boost
+        UNUSED_PIN,                                  // boost_enable
+        UNUSED_PIN,                                  // latch_common
+        UNUSED_PIN,                                  // latch_common_anode
+        UNUSED_PIN,                                  // latch_common_cathode
+        UNUSED_PIN                                   // io_expander_interrupt
+    },
+    0,              // sensor_count
+    CAP_NONE
+};
+
+
+
 const BoardProfile OSPI_PROFILE OSBOARD_PROGMEM = {
 	{{24, 18, 10},
 	 {14, 23, UNUSED_PIN, UNUSED_PIN},
@@ -124,6 +144,9 @@ void select(ProfileId id) {
 		break;
 	case PROFILE_OS_40:
 		profile = &OS40_PROFILE;
+		break;
+	case PROFILE_ESP32S3_SUPERMINI:
+		profile = &ESP32S3_SUPERMINI_PROFILE;
 		break;
 	case PROFILE_OSPI_BOARD:
 		profile = &OSPI_PROFILE;

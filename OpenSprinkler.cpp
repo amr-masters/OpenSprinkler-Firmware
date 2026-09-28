@@ -42,7 +42,17 @@
 #if defined(ESP32)
 #include <WebServer.h>
 #include <esp_mac.h>
+#if defined(OS_ESP32S3_SUPERMINI)
+#include "boards/esp32s3_supermini_led.h"
 #endif
+#endif
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#pragma message("ESP32 is defined as " TOSTRING(ESP32))	
+#pragma message("OS4 is defined as " TOSTRING(ESP32))
+
+
 
 /** Declare static data members */
 sensor_memory_t OpenSprinkler::sensors[64] = {0};
@@ -456,6 +466,7 @@ unsigned char OpenSprinkler::start_network() {
 
 unsigned char OpenSprinkler::start_ether() {
 	if(!osboard::has(osboard::CAP_ETHERNET)) return 0;
+	#if !defined(OS_ESP32S3_SUPERMINI)
 	#if defined(ESP32)
 	SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_ETHER_CS);
 	if (iopts[IOPT_USE_DHCP] == 0) {
@@ -598,6 +609,9 @@ unsigned char OpenSprinkler::start_ether() {
 		// if wired connection has failed at this point, return depending on whether the user wants to force wired
 		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
 	}
+	#endif
+	#else
+	return 1;
 	#endif
 }
 
@@ -788,7 +802,8 @@ void OpenSprinkler::begin() {
 		expanders[i] = NULL;
 	detect_expanders();
 
-#elif defined(ESP32)
+/*
+	#elif defined(ESP32)
 	osboard::select(osboard::PROFILE_OS_40);
 	// Keep the shared SPI bus idle until external flash support is initialized.
 	pinMode(PIN_FLASH_CS, OUTPUT);
@@ -824,6 +839,107 @@ void OpenSprinkler::begin() {
 
 	for(unsigned char i=0;i<(MAX_NUM_BOARDS)/2;i++) expanders[i] = NULL;
 	detect_expanders();
+*/
+#elif defined(ESP32)
+
+    #if defined(OS_ESP32S3_SUPERMINI)
+
+        /*
+         * ESP32-S3 SuperMini
+         *
+         * 8 stations through one 74HC595:
+         *
+         *   DATA  = GPIO2
+         *   CLOCK = GPIO6
+         *   LATCH = GPIO5
+         *
+         * OE is hard-wired LOW.
+         *
+         * OLED:
+         *   SDA = GPIO8
+         *   SCL = GPIO7
+         *
+         * No PCA9555, CH224, current-sense, Ethernet,
+         * boost converter, or expansion hardware.
+         */
+
+        osboard::select(
+            osboard::PROFILE_ESP32S3_SUPERMINI
+        );
+
+        Wire.begin(
+            PIN_I2C_SDA,
+            PIN_I2C_SCL
+        );
+
+        hw_rev = 1;
+        hw_type = HW_TYPE_AC;
+
+        pinMode(PIN_SR_DATA, OUTPUT);
+        pinMode(PIN_SR_CLOCK, OUTPUT);
+        pinMode(PIN_SR_LATCH, OUTPUT);
+
+        digitalWrite(PIN_SR_DATA, LOW);
+        digitalWrite(PIN_SR_CLOCK, LOW);
+        digitalWrite(PIN_SR_LATCH, HIGH);
+
+    #else
+
+        // Existing OS4 ESP32-C6 initialization follows unchanged.
+
+        osboard::select(osboard::PROFILE_OS_40);
+
+        pinMode(PIN_FLASH_CS, OUTPUT);
+        digitalWrite(PIN_FLASH_CS, HIGH);
+
+        Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+
+        const osboard::HardwareDetection hardware =
+            osboard::detect_os4_hardware(probe_i2c_address);
+
+        hw_type = hardware.power_type;
+        osboard::select(hardware.profile);
+
+        analogReadResolution(12);
+        (void)analogRead(PIN_CURR_SENSE);
+        analogSetPinAttenuation(PIN_CURR_SENSE, ADC_0db);
+
+        if(detect_i2c(hardware.driver_address)) {
+            drio = new PCA9555(hardware.driver_address);
+        } else {
+            drio = new IOEXP(hardware.driver_address);
+        }
+
+        gpio_set_main_expander(drio);
+
+        if(drio->type == IOEXP_TYPE_9555) {
+            drio->i2c_write(
+                NXP_CONFIG_REG,
+                osboard::OS40_IO_CONFIG
+            );
+            drio->i2c_write(
+                NXP_OUTPUT_REG,
+                osboard::OS40_IO_OUTPUT
+            );
+        }
+
+        if (hardware.initialize_usb_pd)
+            usbpd.begin();
+
+        if (hw_type == HW_TYPE_DC) {
+            pinModeExt(PIN_BOOST, OUTPUT);
+            pinModeExt(PIN_BOOST_EN, OUTPUT);
+            digitalWriteExt(PIN_BOOST, LOW);
+            digitalWriteExt(PIN_BOOST_EN, LOW);
+        }
+
+        for(unsigned char i=0;i<(MAX_NUM_BOARDS)/2;i++)
+            expanders[i] = NULL;
+
+        detect_expanders();
+
+    #endif
+
 
 #endif
 
@@ -889,11 +1005,29 @@ void OpenSprinkler::begin() {
 		digitalWriteExt(PIN_RFTX, LOW);
 	}
 
-#if defined(ARDUINO)
+/*
+	#if defined(ARDUINO)
 		status.has_curr_sense = 1;  // OpenSprinkler v3/v4 have current sensing
 		// measure baseline current
 		baseline_current = 80;
 #endif
+*/
+#if defined(ARDUINO)
+
+    #if defined(OS_ESP32S3_SUPERMINI)
+
+        status.has_curr_sense = 0;
+        baseline_current = 0;
+
+    #else
+
+        status.has_curr_sense = 1;  // OpenSprinkler v3/v4 have current sensing
+        baseline_current = 80;
+
+    #endif
+
+#endif
+
 
 #if defined(USE_DISPLAY)
 	lcd_start();
@@ -939,9 +1073,22 @@ void OpenSprinkler::begin() {
 
 	// set button pins
 	// enable internal pullup
+/*
 	pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
 	pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 	pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+*/
+    // set button pins
+    // enable internal pullup
+    if (PIN_BUTTON_1 != osboard::UNUSED_PIN)
+        pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
+
+    if (PIN_BUTTON_2 != osboard::UNUSED_PIN)
+        pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+
+    if (PIN_BUTTON_3 != osboard::UNUSED_PIN)
+        pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+
 
 	// detect and check RTC type
 	RTC.detect();
@@ -961,6 +1108,13 @@ void OpenSprinkler::begin() {
 		ads1115_devices[i] = new ADS1115(address);
 #endif
 	}
+	#if defined(OS_ESP32S3_SUPERMINI)
+
+    osboard::supermini_led.begin();
+    osboard::supermini_led.set(0, 0, 8);
+
+#endif
+
 }
 
 #if defined(ARDUINO)
@@ -1233,6 +1387,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 		}
 	}
 
+/*
 	#elif defined(ESP32)
 	if(hw_type==HW_TYPE_DC && engage_booster) {
 		digitalWriteExt(PIN_BOOST_EN, LOW);
@@ -1255,6 +1410,87 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 			expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
 		}
 	}
+*/
+#elif defined(ESP32)
+
+    #if defined(OS_ESP32S3_SUPERMINI)
+
+        /*
+         * One 74HC595 provides all eight stations.
+         *
+         * station 1 -> Q0
+         * station 2 -> Q1
+         * ...
+         * station 8 -> Q7
+         *
+         * Outputs are active HIGH.
+         *
+         * The existing OpenSprinkler station representation is:
+         *
+         *   applied_station_bits[0] bit 0 = station 1
+         *   applied_station_bits[0] bit 7 = station 8
+         *
+         * MSBFIRST therefore produces the required Q0..Q7
+         * mapping at the 74HC595 outputs.
+         */
+
+        digitalWrite(PIN_SR_LATCH, LOW);
+
+        const uint8_t bits = applied_station_bits[0];
+
+        for (int8_t s = 7; s >= 0; --s) {
+
+            digitalWrite(PIN_SR_CLOCK, LOW);
+
+            digitalWrite(
+                PIN_SR_DATA,
+                (bits & (1U << s)) ? HIGH : LOW
+            );
+
+            digitalWrite(PIN_SR_CLOCK, HIGH);
+        }
+
+        digitalWrite(PIN_SR_LATCH, HIGH);
+
+    #else
+
+        // Existing OS4 PCA9555 implementation.
+
+        if(hw_type==HW_TYPE_DC && engage_booster) {
+            digitalWriteExt(PIN_BOOST_EN, LOW);
+            digitalWriteExt(PIN_BOOST, HIGH);
+            delay((int)iopts[IOPT_BOOST_TIME]<<2);
+            digitalWriteExt(PIN_BOOST, LOW);
+            digitalWriteExt(PIN_BOOST_EN, HIGH);
+            engage_booster = 0;
+        }
+
+        if(drio) {
+            uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);
+            reg = (reg & 0xFF00) | applied_station_bits[0];
+            drio->i2c_write(NXP_OUTPUT_REG, reg);
+        }
+
+        for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
+            uint16_t data =
+                ((uint16_t)applied_station_bits[i*2+2] << 8) |
+                applied_station_bits[i*2+1];
+
+            if(expanders[i]->type==IOEXP_TYPE_9555) {
+                expanders[i]->i2c_write(
+                    NXP_OUTPUT_REG,
+                    data
+                );
+            } else {
+                expanders[i]->i2c_write(
+                    NXP_OUTPUT_REG,
+                    ~data
+                );
+            }
+        }
+
+    #endif
+
 
 	#else
 		digitalWrite(PIN_SR_LATCH, LOW);

@@ -13,6 +13,7 @@ enum ProfileId : uint8_t {
 	PROFILE_OS_32_33,
 	PROFILE_OS_34,
 	PROFILE_OS_40,
+	PROFILE_ESP32S3_SUPERMINI,
 	PROFILE_OSPI_BOARD,
 	PROFILE_DEMO_BOARD,
 };
@@ -98,5 +99,19 @@ constexpr uint8_t OSPI_SHIFT_DATA_PIN = 27;
 constexpr uint8_t OSPI_SHIFT_DATA_ALT_PIN = 21;
 constexpr uint8_t OSPI_SHIFT_CLOCK_PIN = 4;
 constexpr uint8_t OSPI_SHIFT_OUTPUT_ENABLE_PIN = 17;
+
+// ESP32-S3 SuperMini custom sprinkler controller.
+constexpr uint8_t S3SM_HARDWARE_VERSION = 41;
+
+constexpr uint8_t S3SM_SR_DATA_PIN  = 2;
+constexpr uint8_t S3SM_SR_CLOCK_PIN = 6;
+constexpr uint8_t S3SM_SR_LATCH_PIN = 5;
+
+constexpr uint8_t S3SM_I2C_SDA_PIN  = 8;
+constexpr uint8_t S3SM_I2C_SCL_PIN  = 7;
+
+constexpr uint8_t S3SM_NEOPIXEL_PIN = 48;
+constexpr uint8_t S3SM_OLED_ADDRESS = 0x3C;
+
 
 } // namespace osboard
